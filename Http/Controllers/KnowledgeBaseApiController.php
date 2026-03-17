@@ -6,6 +6,7 @@ use App\Conversation;
 use App\Mailbox;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Http\Request;
 use Modules\KnowledgeBase\Entities\KbCategory;
 use Modules\KnowledgeBase\Entities\KbArticle;
@@ -50,7 +51,7 @@ class KnowledgeBaseApiController extends Controller
                 return $c->checkVisibility();
             });
 
-            if ($nested) {
+            if ($nested && $this->supportsNestedCategories()) {
                 // Build tree using getTree to fetch children at each level
                 $items = $this->buildCategoryTree(0, $mailbox->id, $locale);
             } else {
@@ -144,9 +145,11 @@ class KnowledgeBaseApiController extends Controller
             $categoryUrl = $this->buildCategoryUrl($mailbox->id, $category->id);
             $clientCategoryUrl = $this->buildClientCategoryUrl($mailbox->id, $category->id);
 
-            // Build subcategories (direct children) using getTree to avoid relying on a parent_id column
+            // Build subcategories (direct children) — only supported when KB module has parent_id column
             $subcategories = [];
-            $children = \KbCategory::getTree($mailbox->id, [], $category->id, false);
+            $children = $this->supportsNestedCategories()
+                ? \KbCategory::getTree($mailbox->id, [], $category->id, false)
+                : [];
 
             foreach ($children as $child) {
                 if (!$child->checkVisibility()) {
@@ -354,6 +357,17 @@ class KnowledgeBaseApiController extends Controller
         } catch (\Exception $e) {
             return Response::json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Check whether the installed KB module version supports nested categories.
+     * Nested categories require a parent_id column on kb_categories.
+     *
+     * @return bool
+     */
+    private function supportsNestedCategories()
+    {
+        return Schema::hasColumn('kb_categories', 'parent_id');
     }
 
     /**
@@ -640,7 +654,7 @@ class KnowledgeBaseApiController extends Controller
                 'generated_at' => now()->toIso8601String(),
             ];
 
-            if ($nested) {
+            if ($nested && $this->supportsNestedCategories()) {
                 $exportData['categories'] = $this->buildExportCategoryTree(0, $mailbox->id, $locale, $includeHidden);
             } else {
                 foreach ($visibleCategories as $category) {

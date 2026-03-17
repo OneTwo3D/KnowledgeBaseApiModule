@@ -24,17 +24,6 @@ class KnowledgeBaseApiController extends Controller
     public function __construct()
     {
         // Token validation is handled by middleware
-
-        // DEBUG: log a stack trace whenever a query containing parent_id hits the DB.
-        // Remove this block once the source is identified.
-        \DB::listen(function ($query) {
-            if (stripos($query->sql, 'parent_id') !== false) {
-                $trace = collect(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 30))
-                    ->map(fn($f) => ($f['file'] ?? '?').':'.(($f['line']) ?? '?').' -> '.($f['class'] ?? '').($f['type'] ?? '').($f['function'] ?? ''))
-                    ->implode("\n");
-                \Log::error("[KbApiDebug] parent_id query detected.\nSQL: {$query->sql}\nBindings: ".json_encode($query->bindings)."\nTrace:\n{$trace}");
-            }
-        });
     }
 
     /**
@@ -72,6 +61,7 @@ class KnowledgeBaseApiController extends Controller
                 'categories' => $items,
             ], 200);
         } catch (\Exception $e) {
+            \Log::error('[KnowledgeBaseApi] '.$e->getMessage(), ['exception' => $e]);
             return Response::json(['error' => $e->getMessage()], 500);
         }
     }
@@ -158,6 +148,7 @@ class KnowledgeBaseApiController extends Controller
                 'articles' => $articles,
             ], 200);
         } catch (\Exception $e) {
+            \Log::error('[KnowledgeBaseApi] '.$e->getMessage(), ['exception' => $e]);
             return Response::json(['error' => $e->getMessage()], 500);
         }
     }
@@ -203,6 +194,8 @@ class KnowledgeBaseApiController extends Controller
                 $categories = [];
 
                 foreach ($article->categories as $category) {
+                    // Pre-set children so checkVisibility() never fires a WHERE parent_id query.
+                    $category->setRelation('children', collect());
                     // Only include visible categories
                     if (method_exists($category, 'checkVisibility') && $category->checkVisibility()) {
                         $hasVisibleCategory = true;
@@ -239,6 +232,7 @@ class KnowledgeBaseApiController extends Controller
                 'results'    => $results,
             ], 200);
         } catch (\Exception $e) {
+            \Log::error('[KnowledgeBaseApi] '.$e->getMessage(), ['exception' => $e]);
             return Response::json(['error' => $e->getMessage()], 500);
         }
     }
@@ -281,6 +275,7 @@ class KnowledgeBaseApiController extends Controller
             // Check if article belongs to the specified category
             $belongs = false;
             foreach ($article->categories as $cat) {
+                $cat->setRelation('children', collect());
                 if ($cat->id == $categoryId) {
                     $belongs = true;
                     break;
@@ -316,6 +311,7 @@ class KnowledgeBaseApiController extends Controller
                 ],
             ], 200);
         } catch (\Exception $e) {
+            \Log::error('[KnowledgeBaseApi] '.$e->getMessage(), ['exception' => $e]);
             return Response::json(['error' => $e->getMessage()], 500);
         }
     }
@@ -405,6 +401,7 @@ class KnowledgeBaseApiController extends Controller
 
             return Response::json($response, 200);
         } catch (\Exception $e) {
+            \Log::error('[KnowledgeBaseApi] '.$e->getMessage(), ['exception' => $e]);
             return Response::json(['error' => $e->getMessage()], 500);
         }
     }
@@ -477,6 +474,7 @@ class KnowledgeBaseApiController extends Controller
 
             return Response::json($exportData, 200);
         } catch (\Exception $e) {
+            \Log::error('[KnowledgeBaseApi] '.$e->getMessage(), ['exception' => $e]);
             return Response::json(['error' => $e->getMessage()], 500);
         }
     }

@@ -51,7 +51,8 @@ class KnowledgeBaseApiController extends Controller
             });
 
             if ($nested) {
-                $items = $this->buildCategoryTree($visibleCategories, null, $mailbox->id, $locale);
+                // Build tree using getTree to fetch children at each level
+                $items = $this->buildCategoryTree(0, $mailbox->id, $locale);
             } else {
                 $items = [];
                 foreach ($visibleCategories as $c) {
@@ -65,7 +66,6 @@ class KnowledgeBaseApiController extends Controller
 
                     $items[] = [
                         'id' => $c->id,
-                        'parent_id' => $c->parent_id ?: null,
                         'name' => $c->getAttributeInLocale('name', $locale),
                         'description' => $c->getAttributeInLocale('description', $locale),
                         'url' => $categoryUrl,
@@ -144,11 +144,9 @@ class KnowledgeBaseApiController extends Controller
             $categoryUrl = $this->buildCategoryUrl($mailbox->id, $category->id);
             $clientCategoryUrl = $this->buildClientCategoryUrl($mailbox->id, $category->id);
 
-            // Build subcategories (direct children)
+            // Build subcategories (direct children) using getTree to avoid relying on a parent_id column
             $subcategories = [];
-            $children = KbCategory::where('mailbox_id', $mailbox->id)
-                ->where('parent_id', $category->id)
-                ->get();
+            $children = \KbCategory::getTree($mailbox->id, [], $category->id, false);
 
             foreach ($children as $child) {
                 if (!$child->checkVisibility()) {
@@ -162,7 +160,6 @@ class KnowledgeBaseApiController extends Controller
 
                 $subcategories[] = [
                     'id' => $child->id,
-                    'parent_id' => $category->id,
                     'name' => $child->getAttributeInLocale('name', $locale),
                     'description' => $child->getAttributeInLocale('description', $locale),
                     'url' => $this->buildCategoryUrl($mailbox->id, $child->id),
@@ -177,7 +174,6 @@ class KnowledgeBaseApiController extends Controller
                 'name' => $mailbox->name,
                 'category' => [
                     'id' => $category->id,
-                    'parent_id' => $category->parent_id ?: null,
                     'name' => $category->getAttributeInLocale('name', $locale),
                     'description' => $category->getAttributeInLocale('description', $locale),
                     'url' => $categoryUrl,
@@ -362,26 +358,24 @@ class KnowledgeBaseApiController extends Controller
 
     /**
      * Recursively build a nested category tree for the categories list endpoint.
+     * Uses KbCategory::getTree() to fetch children so no direct parent_id column is needed.
      *
-     * @param array|\Illuminate\Support\Collection $allCategories  Pre-filtered visible categories
-     * @param int|null $parentId
+     * @param int $parentId  0 for root-level categories
      * @param int $mailboxId
      * @param string $locale
      * @return array
      */
-    private function buildCategoryTree($allCategories, $parentId, $mailboxId, $locale)
+    private function buildCategoryTree($parentId, $mailboxId, $locale)
     {
         $tree = [];
 
-        foreach ($allCategories as $category) {
-            $catParentId = $category->parent_id ?: null;
+        // getTree with $recursive=false returns only direct children of $parentId
+        $children = \KbCategory::getTree($mailboxId, [], $parentId, false);
 
-            if ($catParentId !== $parentId) {
+        foreach ($children as $category) {
+            if (!$category->checkVisibility()) {
                 continue;
             }
-
-            $categoryUrl = $this->buildCategoryUrl($mailboxId, $category->id);
-            $clientUrl = $this->buildClientCategoryUrl($mailboxId, $category->id);
 
             $articleCount = 0;
             if (method_exists($category, 'getArticlesSorted')) {
@@ -390,13 +384,12 @@ class KnowledgeBaseApiController extends Controller
 
             $tree[] = [
                 'id' => $category->id,
-                'parent_id' => $category->parent_id ?: null,
                 'name' => $category->getAttributeInLocale('name', $locale),
                 'description' => $category->getAttributeInLocale('description', $locale),
-                'url' => $categoryUrl,
-                'client_url' => $clientUrl,
+                'url' => $this->buildCategoryUrl($mailboxId, $category->id),
+                'client_url' => $this->buildClientCategoryUrl($mailboxId, $category->id),
                 'article_count' => $articleCount,
-                'children' => $this->buildCategoryTree($allCategories, $category->id, $mailboxId, $locale),
+                'children' => $this->buildCategoryTree($category->id, $mailboxId, $locale),
             ];
         }
 
@@ -631,15 +624,14 @@ class KnowledgeBaseApiController extends Controller
             $includeHidden = $request->input('include_hidden', false);
             $nested = filter_var($request->input('nested', false), FILTER_VALIDATE_BOOLEAN);
 
-            // Get all categories for this mailbox
-            $allCategories = KbCategory::where('mailbox_id', $mailbox->id)
-                ->orderBy('id')
-                ->get();
-
-            // Filter out hidden categories unless include_hidden is set
-            $visibleCategories = $allCategories->filter(function ($category) use ($includeHidden) {
-                return $includeHidden || $category->checkVisibility();
-            });
+            // Get all categories for this mailbox (flat list for the non-nested path)
+            $visibleCategories = \KbCategory::getTree($mailbox->id, [], 0, true);
+            if (!$includeHidden) {
+                $visibleCategories = array_filter(
+                    is_array($visibleCategories) ? $visibleCategories : $visibleCategories->all(),
+                    fn($c) => $c->checkVisibility()
+                );
+            }
 
             $exportData = [
                 'mailbox_id' => $mailbox->id,
@@ -649,12 +641,11 @@ class KnowledgeBaseApiController extends Controller
             ];
 
             if ($nested) {
-                $exportData['categories'] = $this->buildExportCategoryTree($visibleCategories, null, $mailbox->id, $locale, $includeHidden);
+                $exportData['categories'] = $this->buildExportCategoryTree(0, $mailbox->id, $locale, $includeHidden);
             } else {
                 foreach ($visibleCategories as $category) {
                     $categoryData = [
                         'id' => $category->id,
-                        'parent_id' => $category->parent_id ?: null,
                         'name' => $category->getAttributeInLocale('name', $locale),
                         'description' => $category->getAttributeInLocale('description', $locale),
                         'url' => $this->buildCategoryUrl($mailbox->id, $category->id),
@@ -690,22 +681,23 @@ class KnowledgeBaseApiController extends Controller
 
     /**
      * Recursively build a nested export category tree.
+     * Uses KbCategory::getTree() to fetch children so no direct parent_id column is needed.
      *
-     * @param \Illuminate\Support\Collection $allCategories  Pre-filtered visible categories
-     * @param int|null $parentId
+     * @param int $parentId  0 for root-level categories
      * @param int $mailboxId
      * @param string $locale
      * @param bool $includeHidden
      * @return array
      */
-    private function buildExportCategoryTree($allCategories, $parentId, $mailboxId, $locale, $includeHidden)
+    private function buildExportCategoryTree($parentId, $mailboxId, $locale, $includeHidden)
     {
         $tree = [];
 
-        foreach ($allCategories as $category) {
-            $catParentId = $category->parent_id ?: null;
+        // getTree with $recursive=false returns only direct children of $parentId
+        $children = \KbCategory::getTree($mailboxId, [], $parentId, false);
 
-            if ($catParentId !== $parentId) {
+        foreach ($children as $category) {
+            if (!$includeHidden && !$category->checkVisibility()) {
                 continue;
             }
 
@@ -728,13 +720,12 @@ class KnowledgeBaseApiController extends Controller
 
             $tree[] = [
                 'id' => $category->id,
-                'parent_id' => $category->parent_id ?: null,
                 'name' => $category->getAttributeInLocale('name', $locale),
                 'description' => $category->getAttributeInLocale('description', $locale),
                 'url' => $this->buildCategoryUrl($mailboxId, $category->id),
                 'client_url' => $this->buildClientCategoryUrl($mailboxId, $category->id),
                 'articles' => $articleData,
-                'subcategories' => $this->buildExportCategoryTree($allCategories, $category->id, $mailboxId, $locale, $includeHidden),
+                'subcategories' => $this->buildExportCategoryTree($category->id, $mailboxId, $locale, $includeHidden),
             ];
         }
 

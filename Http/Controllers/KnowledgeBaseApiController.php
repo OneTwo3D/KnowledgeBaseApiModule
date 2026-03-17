@@ -43,35 +43,36 @@ class KnowledgeBaseApiController extends Controller
             $categories = \KbCategory::getTree($mailbox->id, [], 0, true);
 
             $locale = $request->input('locale') ?? \Kb::defaultLocale($mailbox);
+            $nested = filter_var($request->input('nested', false), FILTER_VALIDATE_BOOLEAN);
 
-            $items = [];
+            // Filter to only visible categories
+            $visibleCategories = array_filter(is_array($categories) ? $categories : $categories->all(), function ($c) {
+                return $c->checkVisibility();
+            });
 
-            foreach ($categories as $c) {
-                if (!$c->checkVisibility()) {
-                    continue;
+            if ($nested) {
+                $items = $this->buildCategoryTree($visibleCategories, null, $mailbox->id, $locale);
+            } else {
+                $items = [];
+                foreach ($visibleCategories as $c) {
+                    $categoryUrl = $this->buildCategoryUrl($mailbox->id, $c->id);
+                    $clientUrl = $this->buildClientCategoryUrl($mailbox->id, $c->id);
+
+                    $articleCount = 0;
+                    if (method_exists($c, 'getArticlesSorted')) {
+                        $articleCount = count($c->getArticlesSorted(true));
+                    }
+
+                    $items[] = [
+                        'id' => $c->id,
+                        'parent_id' => $c->parent_id ?: null,
+                        'name' => $c->getAttributeInLocale('name', $locale),
+                        'description' => $c->getAttributeInLocale('description', $locale),
+                        'url' => $categoryUrl,
+                        'client_url' => $clientUrl,
+                        'article_count' => $articleCount,
+                    ];
                 }
-                
-                // Generate URL for the category
-                $categoryUrl = $this->buildCategoryUrl($mailbox->id, $c->id);
-                
-                // Generate client URL if template is set
-                $clientUrl = $this->buildClientCategoryUrl($mailbox->id, $c->id);
-                
-                // Get article count - only published articles
-                $articleCount = 0;
-                if (method_exists($c, 'getArticlesSorted')) {
-                    $articles = $c->getArticlesSorted(true); // true = published only
-                    $articleCount = count($articles);
-                }
-                
-                $items[] = (object)[
-                    'id' => $c->id,
-                    'name' => $c->getAttributeInLocale('name', $locale),
-                    'description' => $c->getAttributeInLocale('description', $locale),
-                    'url' => $categoryUrl,
-                    'client_url' => $clientUrl,
-                    'article_count' => $articleCount
-                ];
             }
 
             return Response::json([
@@ -143,16 +144,45 @@ class KnowledgeBaseApiController extends Controller
             $categoryUrl = $this->buildCategoryUrl($mailbox->id, $category->id);
             $clientCategoryUrl = $this->buildClientCategoryUrl($mailbox->id, $category->id);
 
+            // Build subcategories (direct children)
+            $subcategories = [];
+            $children = KbCategory::where('mailbox_id', $mailbox->id)
+                ->where('parent_id', $category->id)
+                ->get();
+
+            foreach ($children as $child) {
+                if (!$child->checkVisibility()) {
+                    continue;
+                }
+
+                $childArticleCount = 0;
+                if (method_exists($child, 'getArticlesSorted')) {
+                    $childArticleCount = count($child->getArticlesSorted(true));
+                }
+
+                $subcategories[] = [
+                    'id' => $child->id,
+                    'parent_id' => $category->id,
+                    'name' => $child->getAttributeInLocale('name', $locale),
+                    'description' => $child->getAttributeInLocale('description', $locale),
+                    'url' => $this->buildCategoryUrl($mailbox->id, $child->id),
+                    'client_url' => $this->buildClientCategoryUrl($mailbox->id, $child->id),
+                    'article_count' => $childArticleCount,
+                ];
+            }
+
             return Response::json([
                 'id' => 0,
                 'mailbox_id' => $mailbox->id,
                 'name' => $mailbox->name,
-                'category' => (object)[
+                'category' => [
                     'id' => $category->id,
+                    'parent_id' => $category->parent_id ?: null,
                     'name' => $category->getAttributeInLocale('name', $locale),
                     'description' => $category->getAttributeInLocale('description', $locale),
                     'url' => $categoryUrl,
-                    'client_url' => $clientCategoryUrl
+                    'client_url' => $clientCategoryUrl,
+                    'subcategories' => $subcategories,
                 ],
                 'articles' => $articles,
             ], 200);
@@ -328,6 +358,49 @@ class KnowledgeBaseApiController extends Controller
         } catch (\Exception $e) {
             return Response::json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Recursively build a nested category tree for the categories list endpoint.
+     *
+     * @param array|\Illuminate\Support\Collection $allCategories  Pre-filtered visible categories
+     * @param int|null $parentId
+     * @param int $mailboxId
+     * @param string $locale
+     * @return array
+     */
+    private function buildCategoryTree($allCategories, $parentId, $mailboxId, $locale)
+    {
+        $tree = [];
+
+        foreach ($allCategories as $category) {
+            $catParentId = $category->parent_id ?: null;
+
+            if ($catParentId !== $parentId) {
+                continue;
+            }
+
+            $categoryUrl = $this->buildCategoryUrl($mailboxId, $category->id);
+            $clientUrl = $this->buildClientCategoryUrl($mailboxId, $category->id);
+
+            $articleCount = 0;
+            if (method_exists($category, 'getArticlesSorted')) {
+                $articleCount = count($category->getArticlesSorted(true));
+            }
+
+            $tree[] = [
+                'id' => $category->id,
+                'parent_id' => $category->parent_id ?: null,
+                'name' => $category->getAttributeInLocale('name', $locale),
+                'description' => $category->getAttributeInLocale('description', $locale),
+                'url' => $categoryUrl,
+                'client_url' => $clientUrl,
+                'article_count' => $articleCount,
+                'children' => $this->buildCategoryTree($allCategories, $category->id, $mailboxId, $locale),
+            ];
+        }
+
+        return $tree;
     }
 
     /**
@@ -556,64 +629,115 @@ class KnowledgeBaseApiController extends Controller
 
             $locale = $request->input('locale') ?? \Kb::defaultLocale($mailbox);
             $includeHidden = $request->input('include_hidden', false);
-            
+            $nested = filter_var($request->input('nested', false), FILTER_VALIDATE_BOOLEAN);
+
             // Get all categories for this mailbox
-            $categories = KbCategory::where('mailbox_id', $mailbox->id)
+            $allCategories = KbCategory::where('mailbox_id', $mailbox->id)
                 ->orderBy('id')
                 ->get();
-                
+
+            // Filter out hidden categories unless include_hidden is set
+            $visibleCategories = $allCategories->filter(function ($category) use ($includeHidden) {
+                return $includeHidden || $category->checkVisibility();
+            });
+
             $exportData = [
                 'mailbox_id' => $mailbox->id,
                 'name' => $mailbox->name,
                 'categories' => [],
                 'generated_at' => now()->toIso8601String(),
             ];
-            
-            // Process each category
-            foreach ($categories as $category) {
-                // Skip hidden categories if requested
-                if (!$includeHidden && !$category->checkVisibility()) {
-                    continue;
-                }
-                
-                $categoryData = [
-                    'id' => $category->id,
-                    'name' => $category->getAttributeInLocale('name', $locale),
-                    'description' => $category->getAttributeInLocale('description', $locale),
-                    'url' => $this->buildCategoryUrl($mailbox->id, $category->id),
-                    'client_url' => $this->buildClientCategoryUrl($mailbox->id, $category->id),
-                    'articles' => []
-                ];
-                
-                // Get articles for this category
-                $articles = [];
-                if (method_exists($category, 'getArticlesSorted')) {
-                    // Get all articles (published only if not including hidden)
-                    $articles = $category->getArticlesSorted(!$includeHidden);
-                }
-                
-                // Process each article
-                foreach ($articles as $article) {
-                    $article->setLocale($locale);
-                    
-                    $articleData = [
-                        'id' => $article->id,
-                        'title' => $article->getAttributeInLocale('title', $locale),
-                        'text' => $article->getAttributeInLocale('text', $locale),
-                        'status' => $article->status,
-                        'url' => $this->buildArticleUrl($mailbox->id, $category->id, $article->id),
-                        'client_url' => $this->buildClientArticleUrl($mailbox->id, $category->id, $article->id),
+
+            if ($nested) {
+                $exportData['categories'] = $this->buildExportCategoryTree($visibleCategories, null, $mailbox->id, $locale, $includeHidden);
+            } else {
+                foreach ($visibleCategories as $category) {
+                    $categoryData = [
+                        'id' => $category->id,
+                        'parent_id' => $category->parent_id ?: null,
+                        'name' => $category->getAttributeInLocale('name', $locale),
+                        'description' => $category->getAttributeInLocale('description', $locale),
+                        'url' => $this->buildCategoryUrl($mailbox->id, $category->id),
+                        'client_url' => $this->buildClientCategoryUrl($mailbox->id, $category->id),
+                        'articles' => [],
                     ];
-                    
-                    $categoryData['articles'][] = $articleData;
+
+                    $articles = method_exists($category, 'getArticlesSorted')
+                        ? $category->getArticlesSorted(!$includeHidden)
+                        : [];
+
+                    foreach ($articles as $article) {
+                        $article->setLocale($locale);
+                        $categoryData['articles'][] = [
+                            'id' => $article->id,
+                            'title' => $article->getAttributeInLocale('title', $locale),
+                            'text' => $article->getAttributeInLocale('text', $locale),
+                            'status' => $article->status,
+                            'url' => $this->buildArticleUrl($mailbox->id, $category->id, $article->id),
+                            'client_url' => $this->buildClientArticleUrl($mailbox->id, $category->id, $article->id),
+                        ];
+                    }
+
+                    $exportData['categories'][] = $categoryData;
                 }
-                
-                $exportData['categories'][] = $categoryData;
             }
-            
+
             return Response::json($exportData, 200);
         } catch (\Exception $e) {
             return Response::json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Recursively build a nested export category tree.
+     *
+     * @param \Illuminate\Support\Collection $allCategories  Pre-filtered visible categories
+     * @param int|null $parentId
+     * @param int $mailboxId
+     * @param string $locale
+     * @param bool $includeHidden
+     * @return array
+     */
+    private function buildExportCategoryTree($allCategories, $parentId, $mailboxId, $locale, $includeHidden)
+    {
+        $tree = [];
+
+        foreach ($allCategories as $category) {
+            $catParentId = $category->parent_id ?: null;
+
+            if ($catParentId !== $parentId) {
+                continue;
+            }
+
+            $articles = method_exists($category, 'getArticlesSorted')
+                ? $category->getArticlesSorted(!$includeHidden)
+                : [];
+
+            $articleData = [];
+            foreach ($articles as $article) {
+                $article->setLocale($locale);
+                $articleData[] = [
+                    'id' => $article->id,
+                    'title' => $article->getAttributeInLocale('title', $locale),
+                    'text' => $article->getAttributeInLocale('text', $locale),
+                    'status' => $article->status,
+                    'url' => $this->buildArticleUrl($mailboxId, $category->id, $article->id),
+                    'client_url' => $this->buildClientArticleUrl($mailboxId, $category->id, $article->id),
+                ];
+            }
+
+            $tree[] = [
+                'id' => $category->id,
+                'parent_id' => $category->parent_id ?: null,
+                'name' => $category->getAttributeInLocale('name', $locale),
+                'description' => $category->getAttributeInLocale('description', $locale),
+                'url' => $this->buildCategoryUrl($mailboxId, $category->id),
+                'client_url' => $this->buildClientCategoryUrl($mailboxId, $category->id),
+                'articles' => $articleData,
+                'subcategories' => $this->buildExportCategoryTree($allCategories, $category->id, $mailboxId, $locale, $includeHidden),
+            ];
+        }
+
+        return $tree;
     }
 }

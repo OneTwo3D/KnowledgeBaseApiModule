@@ -107,161 +107,269 @@
                     <h3 class="panel-title"><i class="glyphicon glyphicon-book"></i> {{ __('API Documentation') }}</h3>
                 </div>
                 <div class="panel-body">
+
+                    {{-- ── Endpoints ────────────────────────────────────────────────────── --}}
                     <h4>{{ __('Available Endpoints') }}</h4>
-                    
                     <div class="table-responsive">
                         <table class="table table-bordered table-striped">
                             <thead>
                                 <tr>
+                                    <th>{{ __('Method') }}</th>
                                     <th>{{ __('Endpoint') }}</th>
                                     <th>{{ __('Description') }}</th>
-                                    <th>{{ __('Example') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
+                                    <td><span class="label label-primary">GET</span></td>
                                     <td><code>/api/knowledgebase/{mailboxId}/categories</code></td>
-                                    <td>{{ __('Get all categories from a mailbox') }}</td>
-                                    <td><code>/api/knowledgebase/1/categories?token=YOUR_TOKEN</code></td>
+                                    <td>
+                                        {{ __('List all visible categories. Returns a flat list with') }} <code>parent_id</code> {{ __('by default.') }}
+                                        {{ __('Pass') }} <code>?nested=true</code> {{ __('for a recursive tree with') }} <code>children</code> {{ __('arrays.') }}
+                                    </td>
                                 </tr>
                                 <tr>
+                                    <td><span class="label label-primary">GET</span></td>
                                     <td><code>/api/knowledgebase/{mailboxId}/categories/{categoryId}</code></td>
-                                    <td>{{ __('Get a specific category with its articles') }}</td>
-                                    <td><code>/api/knowledgebase/1/categories/5?token=YOUR_TOKEN</code></td>
+                                    <td>{{ __('Get a single category with its articles and a') }} <code>subcategories</code> {{ __('array of direct children.') }}</td>
                                 </tr>
                                 <tr>
+                                    <td><span class="label label-primary">GET</span></td>
                                     <td><code>/api/knowledgebase/{mailboxId}/categories/{categoryId}/articles/{articleId}</code></td>
-                                    <td>{{ __('Get a specific article within a category') }}</td>
-                                    <td><code>/api/knowledgebase/1/categories/5/articles/10?token=YOUR_TOKEN</code></td>
+                                    <td>{{ __('Get a single published article.') }}</td>
                                 </tr>
                                 <tr>
+                                    <td><span class="label label-primary">GET</span></td>
                                     <td><code>/api/knowledgebase/{mailboxId}/search</code></td>
-                                    <td>{{ __('Search for articles by keyword') }}</td>
-                                    <td><code>/api/knowledgebase/1/search?q=help&token=YOUR_TOKEN</code></td>
+                                    <td>{{ __('Full-text search across published articles. Requires') }} <code>?q=</code>.</td>
                                 </tr>
                                 <tr>
+                                    <td><span class="label label-primary">GET</span></td>
                                     <td><code>/api/knowledgebase/{mailboxId}/popular</code></td>
-                                    <td>{{ __('Get most popular articles and categories') }}</td>
-                                    <td><code>/api/knowledgebase/1/popular?token=YOUR_TOKEN</code></td>
+                                    <td>{{ __('Most-viewed categories and/or articles, ranked by view count.') }}</td>
                                 </tr>
                                 <tr>
+                                    <td><span class="label label-primary">GET</span></td>
                                     <td><code>/api/knowledgebase/{mailboxId}/export</code></td>
-                                    <td>{{ __('Export all KB content for AI training') }}</td>
-                                    <td><code>/api/knowledgebase/1/export?token=YOUR_TOKEN</code></td>
+                                    <td>
+                                        {{ __('Export all KB content (flat by default).') }}
+                                        {{ __('Pass') }} <code>?nested=true</code> {{ __('for hierarchical output with') }} <code>subcategories</code> {{ __('inside each category.') }}
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
+                    {{-- ── Query Parameters ─────────────────────────────────────────────── --}}
                     <h4>{{ __('Query Parameters') }}</h4>
                     <div class="well">
                         <dl class="dl-horizontal">
                             <dt><code>token</code> <span class="text-danger">*</span></dt>
-                            <dd>{{ __('Your API token for authentication (required)') }}</dd>
+                            <dd>{{ __('API token for authentication (required on every request).') }}</dd>
 
-                            <dt><code>format</code></dt>
-                            <dd>{{ __('Response format. Options: json (default)') }}</dd>
-
-                            <dt><code>q</code></dt>
-                            <dd>{{ __('Search query keyword (required for search endpoint)') }}</dd>
-
-                            <dt><code>locale</code></dt>
-                            <dd>{{ __('Optional locale for returned content (default: mailbox default locale)') }}</dd>
-
-                            <dt><code>limit</code></dt>
-                            <dd>{{ __('Maximum number of results to return (applicable to popular endpoint, default: 5)') }}</dd>
-
-                            <dt><code>type</code></dt>
-                            <dd>{{ __('Filter type for popular endpoint. Options: all (default), articles, categories') }}</dd>
-
-                            <dt><code>include_hidden</code></dt>
-                            <dd>{{ __('Include hidden/unpublished content in export endpoint. Options: true, false (default)') }}</dd>
+                            <dt><code>locale</code> / <code>lang</code></dt>
+                            <dd>
+                                {{ __('Language code for returned content (e.g.') }} <code>en</code>, <code>de</code>).
+                                {{ __('Falls back to the mailbox default locale when omitted.') }}
+                                {{ __('Both parameter names are accepted; ') }}<code>lang</code> {{ __('takes priority.') }}
+                            </dd>
 
                             <dt><code>nested</code></dt>
                             <dd>
-                                {{ __('Return categories as a nested tree instead of a flat list. Applies to the categories list and export endpoints. Options: true, false (default)') }}
+                                {{ __('Return a recursive category tree instead of a flat list.') }}
+                                {{ __('Accepted values:') }} <code>true</code> / <code>1</code> {{ __('or') }} <code>false</code> / <code>0</code> ({{ __('default') }}).
                                 <br>
-                                <small class="text-muted">{{ __('When enabled, top-level categories contain a "children" array (categories endpoint) or a "subcategories" array (export endpoint) with their child categories recursively nested inside.') }}</small>
+                                <small class="text-muted">
+                                    {{ __('Applies to') }} <code>/categories</code> {{ __('and') }} <code>/export</code>.
+                                    {{ __('On') }} <code>/categories</code> {{ __('each node gains a') }} <code>children</code> {{ __('array; on') }} <code>/export</code> {{ __('each node gains a') }} <code>subcategories</code> {{ __('array.') }}
+                                </small>
                                 <br>
-                                <small class="text-muted">{{ __('Without this flag, every category still includes a "parent_id" field (null for top-level) so you can build the tree client-side.') }}</small>
+                                <small class="text-muted">
+                                    {{ __('When omitted (flat mode), every category includes a') }} <code>parent_id</code> {{ __('field (') }}<code>null</code> {{ __('for root) so clients can build the tree themselves.') }}
+                                </small>
                             </dd>
+
+                            <dt><code>q</code></dt>
+                            <dd>{{ __('Search keyword — required for') }} <code>/search</code>.</dd>
+
+                            <dt><code>limit</code></dt>
+                            <dd>{{ __('Max results returned by') }} <code>/popular</code> {{ __('(default: 5).') }}</dd>
+
+                            <dt><code>type</code></dt>
+                            <dd>{{ __('Filter for') }} <code>/popular</code>: <code>all</code> ({{ __('default') }}), <code>articles</code>, <code>categories</code>.</dd>
+
+                            <dt><code>include_hidden</code></dt>
+                            <dd>{{ __('Include hidden/draft content in') }} <code>/export</code>. {{ __('Default:') }} <code>false</code>.</dd>
                         </dl>
                     </div>
-                    
+
+                    {{-- ── Response Shapes ──────────────────────────────────────────────── --}}
+                    <h4>{{ __('Response Shapes') }}</h4>
+
+                    <p><strong><code>GET /categories</code></strong> — {{ __('flat (default)') }}</p>
+                    <pre>{
+  "mailbox_id": 1,
+  "name": "My Mailbox",
+  "categories": [
+    {
+      "id": 3,
+      "parent_id": null,
+      "name": "Getting Started",
+      "description": "...",
+      "url": "https://example.com/kb/category/3",
+      "client_url": null,
+      "article_count": 4
+    },
+    {
+      "id": 7,
+      "parent_id": 3,
+      "name": "Installation",
+      "description": "...",
+      "url": "https://example.com/kb/category/7",
+      "client_url": null,
+      "article_count": 2
+    }
+  ]
+}</pre>
+
+                    <p><strong><code>GET /categories?nested=true</code></strong> — {{ __('tree') }}</p>
+                    <pre>{
+  "mailbox_id": 1,
+  "name": "My Mailbox",
+  "categories": [
+    {
+      "id": 3,
+      "name": "Getting Started",
+      "description": "...",
+      "url": "https://example.com/kb/category/3",
+      "client_url": null,
+      "article_count": 4,
+      "children": [
+        {
+          "id": 7,
+          "name": "Installation",
+          "description": "...",
+          "url": "https://example.com/kb/category/7",
+          "client_url": null,
+          "article_count": 2,
+          "children": []
+        }
+      ]
+    }
+  ]
+}</pre>
+
+                    <p><strong><code>GET /categories/{id}</code></strong></p>
+                    <pre>{
+  "mailbox_id": 1,
+  "name": "My Mailbox",
+  "category": {
+    "id": 3,
+    "name": "Getting Started",
+    "description": "...",
+    "url": "https://example.com/kb/category/3",
+    "client_url": null,
+    "subcategories": [
+      { "id": 7, "name": "Installation", "article_count": 2, ... }
+    ]
+  },
+  "articles": [
+    { "id": 12, "title": "Quick start guide", "text": "...", "url": "...", "client_url": null }
+  ]
+}</pre>
+
+                    <p><strong><code>GET /export?nested=true</code></strong> — {{ __('hierarchical export') }}</p>
+                    <pre>{
+  "mailbox_id": 1,
+  "name": "My Mailbox",
+  "generated_at": "2026-03-17T10:00:00+00:00",
+  "categories": [
+    {
+      "id": 3,
+      "name": "Getting Started",
+      "description": "...",
+      "url": "...",
+      "client_url": null,
+      "articles": [ { "id": 12, "title": "...", "text": "...", "status": 1, ... } ],
+      "subcategories": [
+        {
+          "id": 7,
+          "name": "Installation",
+          "articles": [...],
+          "subcategories": []
+        }
+      ]
+    }
+  ]
+}</pre>
+
+                    {{-- ── Custom URL Templates ─────────────────────────────────────────── --}}
                     <h4>{{ __('Custom URL Templates') }}</h4>
-                    <p>{{ __('You can customize how URLs are returned in API responses using the URL template settings.') }}</p>
-                    
+                    <p>{{ __('Control how') }} <code>url</code> {{ __('and') }} <code>client_url</code> {{ __('fields are built in every response.') }}</p>
                     <div class="well">
-                        <h5>{{ __('Available Placeholders:') }}</h5>
+                        <h5>{{ __('Placeholders') }}</h5>
                         <ul>
-                            <li><code>[mailbox]</code> - {{ __('Replaced with the mailbox ID') }}</li>
-                            <li><code>[category]</code> - {{ __('Replaced with the category ID') }}</li>
-                            <li><code>[article]</code> - {{ __('Replaced with the article ID (for article URLs only)') }}</li>
+                            <li><code>[mailbox]</code> — {{ __('mailbox ID') }}</li>
+                            <li><code>[category]</code> — {{ __('category ID') }}</li>
+                            <li><code>[article]</code> — {{ __('article ID (omitted automatically for category URLs)') }}</li>
                         </ul>
-                        
-                        <h5>{{ __('Examples:') }}</h5>
-                        <p><strong>{{ __('API URLs:') }}</strong></p>
-                        <p>{{ __('If your Custom URL Template is:') }}</p>
-                        <pre>https://your-app.com/api/docs/[category]/[article]</pre>
-                        
-                        <p>{{ __('Then an article with category ID 5 and article ID 10 will have this URL in the response:') }}</p>
-                        <pre>https://your-app.com/api/docs/5/10</pre>
-                        
-                        <p><strong>{{ __('Client URLs:') }}</strong></p>
-                        <p>{{ __('If your Client URL Template is:') }}</p>
-                        <pre>https://ecomgraduates.com/pages/ecomifytheme-documentation?category=[category]&article=[article]</pre>
-                        
-                        <p>{{ __('Then an article with category ID 5 and article ID 10 will have this client_url in the response:') }}</p>
-                        <pre>https://ecomgraduates.com/pages/ecomifytheme-documentation?category=5&article=10</pre>
-                        
-                        <p>{{ __('And a category with ID 5 will have this client_url:') }}</p>
-                        <pre>https://ecomgraduates.com/pages/ecomifytheme-documentation?category=5</pre>
-                        
-                        <div class="alert alert-info">
-                            <i class="glyphicon glyphicon-info-sign"></i> 
-                            {{ __('Client URLs are useful when you need to link directly to your frontend documentation system from API responses.') }}
+                        <h5>{{ __('Example') }}</h5>
+                        <p>{{ __('Client URL Template:') }} <code>https://your-site.com/docs?category=[category]&article=[article]</code></p>
+                        <ul>
+                            <li>{{ __('Article 10 in category 5 →') }} <code>https://your-site.com/docs?category=5&article=10</code></li>
+                            <li>{{ __('Category 5 →') }} <code>https://your-site.com/docs?category=5</code></li>
+                        </ul>
+                        <div class="alert alert-info margin-top-10">
+                            <i class="glyphicon glyphicon-info-sign"></i>
+                            {{ __('Leave both templates empty to use the default FreeScout KB URLs.') }}
                         </div>
                     </div>
 
-                    <h4>{{ __('Example Usage') }}</h4>
-                    <p>{{ __('Curl example to retrieve categories:') }}</p>
-                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/categories?token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
-                    
-                    <p>{{ __('JavaScript example with fetch:') }}</p>
-                    <pre>fetch('{{ url('/api/knowledgebase/1/categories?token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}')
-    .then(response => response.json())
-    .then(data => console.log(data));</pre>
-                    
-                    <p>{{ __('Search example:') }}</p>
-                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/search?q=help&token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
-                    
-                    <p>{{ __('Specific article example:') }}</p>
-                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/categories/5/articles/10?token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
-                    
-                    <p>{{ __('Popular content example:') }}</p>
-                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/popular?limit=5&type=all&token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
-                    
-                    <p>{{ __('Export all content example:') }}</p>
-                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/export?token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
+                    {{-- ── Example Requests ─────────────────────────────────────────────── --}}
+                    <h4>{{ __('Example Requests') }}</h4>
 
-                    <p>{{ __('Nested categories example (returns tree structure with children arrays):') }}</p>
-                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/categories?nested=true&token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
+                    <p>{{ __('Flat category list (default):') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/categories?token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
 
-                    <p>{{ __('Nested export example:') }}</p>
-                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/export?nested=true&token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
+                    <p>{{ __('Nested category tree:') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/categories?nested=true&token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
 
+                    <p>{{ __('Category with subcategories and articles:') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/categories/5?token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
+
+                    <p>{{ __('Single article:') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/categories/5/articles/10?token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
+
+                    <p>{{ __('Search:') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/search?q=installation&token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
+
+                    <p>{{ __('Popular (top 10 articles):') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/popular?type=articles&limit=10&token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
+
+                    <p>{{ __('Flat export with hidden content:') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/export?include_hidden=true&token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
+
+                    <p>{{ __('Nested export:') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/export?nested=true&token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
+
+                    <p>{{ __('Filter by locale (both forms accepted):') }}</p>
+                    <pre>curl "{{ url('/api/knowledgebase/1/categories?lang=de&token=' . ($api_token ?: 'YOUR_TOKEN')) }}"</pre>
+
+                    {{-- ── Try it out ────────────────────────────────────────────────────── --}}
                     <h4>{{ __('Try it out') }} <i class="glyphicon glyphicon-play-circle"></i></h4>
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="api-test-endpoint">{{ __('Endpoint') }}</label>
                                 <select id="api-test-endpoint" class="form-control">
-                                    <option value="categories">{{ __('Get all categories') }}</option>
-                                    <option value="category">{{ __('Get a specific category') }}</option>
-                                    <option value="article">{{ __('Get a specific article') }}</option>
-                                    <option value="search">{{ __('Search articles') }}</option>
-                                    <option value="popular">{{ __('Get popular content') }}</option>
-                                    <option value="export">{{ __('Export all content') }}</option>
+                                    <option value="categories">{{ __('GET /categories — flat list') }}</option>
+                                    <option value="categories-nested">{{ __('GET /categories?nested=true — tree') }}</option>
+                                    <option value="category">{{ __('GET /categories/{id} — category + subcategories') }}</option>
+                                    <option value="article">{{ __('GET /categories/{id}/articles/{id} — article') }}</option>
+                                    <option value="search">{{ __('GET /search — full-text search') }}</option>
+                                    <option value="popular">{{ __('GET /popular — most viewed') }}</option>
+                                    <option value="export">{{ __('GET /export — flat export') }}</option>
+                                    <option value="export-nested">{{ __('GET /export?nested=true — nested export') }}</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -278,7 +386,7 @@
                             </div>
                             <div class="form-group" id="search-keyword-container" style="display: none;">
                                 <label for="api-test-keyword">{{ __('Search Keyword') }}</label>
-                                <input type="text" id="api-test-keyword" class="form-control" value="" placeholder="Enter search term...">
+                                <input type="text" id="api-test-keyword" class="form-control" placeholder="{{ __('Enter search term...') }}">
                             </div>
                             <div class="form-group" id="popular-limit-container" style="display: none;">
                                 <label for="api-test-limit">{{ __('Results Limit') }}</label>
@@ -295,10 +403,9 @@
                             <button type="button" id="api-test-button" class="btn btn-success" {{ empty($api_token) ? 'disabled' : '' }}>
                                 <i class="glyphicon glyphicon-send"></i> {{ __('Send Request') }}
                             </button>
-                            
                             @if(empty($api_token))
                             <p class="text-danger margin-top">
-                                <i class="glyphicon glyphicon-warning-sign"></i> {{ __('Please set and save an API token to test requests') }}
+                                <i class="glyphicon glyphicon-warning-sign"></i> {{ __('Please set and save an API token above to enable testing.') }}
                             </p>
                             @endif
                         </div>
@@ -308,11 +415,12 @@
                                     <h4 class="panel-title">{{ __('Response') }}</h4>
                                 </div>
                                 <div class="panel-body">
-                                    <pre id="api-response" style="max-height: 300px; overflow: auto;">{{ __('Response will appear here...') }}</pre>
+                                    <pre id="api-response" style="max-height: 400px; overflow: auto; font-size: 12px;">{{ __('Response will appear here...') }}</pre>
                                 </div>
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
@@ -341,16 +449,14 @@
         const testButton = document.getElementById('api-test-button');
         const responseElement = document.getElementById('api-response');
         
-        // Show/hide category ID field based on selected endpoint
+        // Show/hide fields based on selected endpoint
         endpointSelect.addEventListener('change', function() {
-            // First, hide all containers
             categoryContainer.style.display = 'none';
             document.getElementById('article-id-container').style.display = 'none';
             document.getElementById('search-keyword-container').style.display = 'none';
             document.getElementById('popular-limit-container').style.display = 'none';
             document.getElementById('popular-type-container').style.display = 'none';
-            
-            // Then show only the relevant ones based on selection
+
             if (this.value === 'category') {
                 categoryContainer.style.display = 'block';
             } else if (this.value === 'article') {
@@ -363,35 +469,41 @@
                 document.getElementById('popular-type-container').style.display = 'block';
             }
         });
-        
+
         // Handle API test request
         testButton.addEventListener('click', function() {
             const endpoint = endpointSelect.value;
             const mailboxId = document.getElementById('api-test-mailbox').value;
+            const base = '{{ url("/api/knowledgebase/") }}/' + mailboxId;
+            const token = 'token={{ $api_token }}';
             let url = '';
-            
+
             if (endpoint === 'categories') {
-                url = '{{ url("/api/knowledgebase/") }}/' + mailboxId + '/categories?token={{ $api_token }}';
+                url = base + '/categories?' + token;
+            } else if (endpoint === 'categories-nested') {
+                url = base + '/categories?nested=true&' + token;
             } else if (endpoint === 'category') {
                 const categoryId = document.getElementById('api-test-category').value;
-                url = '{{ url("/api/knowledgebase/") }}/' + mailboxId + '/categories/' + categoryId + '?token={{ $api_token }}';
+                url = base + '/categories/' + categoryId + '?' + token;
             } else if (endpoint === 'article') {
                 const categoryId = document.getElementById('api-test-category').value;
                 const articleId = document.getElementById('api-test-article').value;
-                url = '{{ url("/api/knowledgebase/") }}/' + mailboxId + '/categories/' + categoryId + '/articles/' + articleId + '?token={{ $api_token }}';
+                url = base + '/categories/' + categoryId + '/articles/' + articleId + '?' + token;
             } else if (endpoint === 'search') {
                 const keyword = document.getElementById('api-test-keyword').value;
                 if (!keyword) {
                     responseElement.textContent = 'Error: Search keyword is required';
                     return;
                 }
-                url = '{{ url("/api/knowledgebase/") }}/' + mailboxId + '/search?q=' + encodeURIComponent(keyword) + '&token={{ $api_token }}';
+                url = base + '/search?q=' + encodeURIComponent(keyword) + '&' + token;
             } else if (endpoint === 'popular') {
                 const limit = document.getElementById('api-test-limit').value;
-                const type = document.getElementById('api-test-type').value;
-                url = '{{ url("/api/knowledgebase/") }}/' + mailboxId + '/popular?token={{ $api_token }}&limit=' + encodeURIComponent(limit) + '&type=' + encodeURIComponent(type);
+                const type  = document.getElementById('api-test-type').value;
+                url = base + '/popular?limit=' + encodeURIComponent(limit) + '&type=' + encodeURIComponent(type) + '&' + token;
             } else if (endpoint === 'export') {
-                url = '{{ url("/api/knowledgebase/") }}/' + mailboxId + '/export?token={{ $api_token }}';
+                url = base + '/export?' + token;
+            } else if (endpoint === 'export-nested') {
+                url = base + '/export?nested=true&' + token;
             }
             
             // Show loading message

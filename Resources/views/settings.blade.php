@@ -158,24 +158,33 @@
                         <dl class="dl-horizontal">
                             <dt><code>token</code> <span class="text-danger">*</span></dt>
                             <dd>{{ __('Your API token for authentication (required)') }}</dd>
-                            
+
                             <dt><code>format</code></dt>
                             <dd>{{ __('Response format. Options: json (default)') }}</dd>
-                            
+
                             <dt><code>q</code></dt>
                             <dd>{{ __('Search query keyword (required for search endpoint)') }}</dd>
-                            
+
                             <dt><code>locale</code></dt>
                             <dd>{{ __('Optional locale for returned content (default: mailbox default locale)') }}</dd>
-                            
+
                             <dt><code>limit</code></dt>
                             <dd>{{ __('Maximum number of results to return (applicable to popular endpoint, default: 5)') }}</dd>
-                            
+
                             <dt><code>type</code></dt>
                             <dd>{{ __('Filter type for popular endpoint. Options: all (default), articles, categories') }}</dd>
-                            
+
                             <dt><code>include_hidden</code></dt>
                             <dd>{{ __('Include hidden/unpublished content in export endpoint. Options: true, false (default)') }}</dd>
+
+                            <dt><code>nested</code></dt>
+                            <dd>
+                                {{ __('Return categories as a nested tree instead of a flat list. Applies to the categories list and export endpoints. Options: true, false (default)') }}
+                                <br>
+                                <small class="text-muted">{{ __('When enabled, top-level categories contain a "children" array (categories endpoint) or a "subcategories" array (export endpoint) with their child categories recursively nested inside.') }}</small>
+                                <br>
+                                <small class="text-muted">{{ __('Without this flag, every category still includes a "parent_id" field (null for top-level) so you can build the tree client-side.') }}</small>
+                            </dd>
                         </dl>
                     </div>
                     
@@ -234,6 +243,12 @@
                     
                     <p>{{ __('Export all content example:') }}</p>
                     <pre>curl -X GET "{{ url('/api/knowledgebase/1/export?token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
+
+                    <p>{{ __('Nested categories example (returns tree structure with children arrays):') }}</p>
+                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/categories?nested=true&token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
+
+                    <p>{{ __('Nested export example:') }}</p>
+                    <pre>curl -X GET "{{ url('/api/knowledgebase/1/export?nested=true&token=' . ($api_token ? $api_token : 'YOUR_TOKEN')) }}"</pre>
 
                     <h4>{{ __('Try it out') }} <i class="glyphicon glyphicon-play-circle"></i></h4>
                     <div class="row">

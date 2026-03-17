@@ -47,7 +47,7 @@ class KnowledgeBaseApiController extends Controller
             // Load all categories via a plain WHERE mailbox_id query — avoids the
             // WHERE parent_id = 0 SQL that getTree() always appends, which crashes on
             // KB module versions that don't have a parent_id column.
-            $allCategories = \KbCategory::query()->setEagerLoads([])->where('mailbox_id', $mailbox->id)->get()->all();
+            $allCategories = \KbCategory::query()->setEagerLoads([])->where('mailbox_id', $mailbox->id)->get()->each(fn($c) => $c->setRelation('children', collect()))->all();
 
             if ($nested) {
                 $items = $this->buildCategoryTree($allCategories, 0, $mailbox->id, $locale);
@@ -82,6 +82,7 @@ class KnowledgeBaseApiController extends Controller
             }
 
             $category = KbCategory::query()->setEagerLoads([])->findOrFail($categoryId);
+            $category->setRelation('children', collect());
             if (!$category->checkVisibility()) {
                 $category = null;
             }
@@ -109,7 +110,7 @@ class KnowledgeBaseApiController extends Controller
 
             // Build subcategories by filtering the full flat list in PHP —
             // avoids generating WHERE parent_id = ? SQL
-            $allCategories = \KbCategory::query()->setEagerLoads([])->where('mailbox_id', $mailbox->id)->get()->all();
+            $allCategories = \KbCategory::query()->setEagerLoads([])->where('mailbox_id', $mailbox->id)->get()->each(fn($c) => $c->setRelation('children', collect()))->all();
             $subcategories = [];
             foreach ($allCategories as $c) {
                 if ((int)($c->parent_id ?? 0) !== (int)$category->id) {
@@ -251,6 +252,7 @@ class KnowledgeBaseApiController extends Controller
 
             // Check if category exists and is visible
             $category = KbCategory::query()->setEagerLoads([])->findOrFail($categoryId);
+            $category->setRelation('children', collect());
             if (!$category->checkVisibility()) {
                 return Response::json(['error' => 'Category not found or not visible'], 404);
             }
@@ -342,6 +344,7 @@ class KnowledgeBaseApiController extends Controller
 
                 foreach ($topCategories as $categoryView) {
                     $category = KbCategory::query()->setEagerLoads([])->find($categoryView->category_id);
+                    if ($category) $category->setRelation('children', collect());
                     if ($category && $category->checkVisibility()) {
                         $popularCategories[] = [
                             'id'          => $category->id,
@@ -369,6 +372,7 @@ class KnowledgeBaseApiController extends Controller
                 foreach ($topArticles as $articleView) {
                     $article  = KbArticle::find($articleView->article_id);
                     $category = KbCategory::query()->setEagerLoads([])->find($articleView->category_id);
+                    if ($category) $category->setRelation('children', collect());
 
                     if ($article && $article->status == KbArticle::STATUS_PUBLISHED && $category && $category->checkVisibility()) {
                         $popularArticles[] = [
@@ -414,7 +418,7 @@ class KnowledgeBaseApiController extends Controller
             $nested        = filter_var($request->input('nested', false), FILTER_VALIDATE_BOOLEAN);
 
             // Load all categories once and filter in PHP
-            $allCategories = \KbCategory::query()->setEagerLoads([])->where('mailbox_id', $mailbox->id)->get()->all();
+            $allCategories = \KbCategory::query()->setEagerLoads([])->where('mailbox_id', $mailbox->id)->get()->each(fn($c) => $c->setRelation('children', collect()))->all();
 
             $exportData = [
                 'mailbox_id'   => $mailbox->id,

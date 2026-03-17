@@ -44,10 +44,10 @@ class KnowledgeBaseApiController extends Controller
             $locale = $this->resolveLocale($request, $mailbox);
             $nested = filter_var($request->input('nested', false), FILTER_VALIDATE_BOOLEAN);
 
-            // Load all categories once; build tree or flat list purely in PHP
-            // (never call getTree with a non-zero parent — it generates WHERE parent_id = ? SQL
-            // which fails on KB module versions that don't have that column)
-            $allCategories = collect(\KbCategory::getTree($mailbox->id, [], 0, true))->all();
+            // Load all categories via a plain WHERE mailbox_id query — avoids the
+            // WHERE parent_id = 0 SQL that getTree() always appends, which crashes on
+            // KB module versions that don't have a parent_id column.
+            $allCategories = \KbCategory::where('mailbox_id', $mailbox->id)->get()->all();
 
             if ($nested) {
                 $items = $this->buildCategoryTree($allCategories, 0, $mailbox->id, $locale);
@@ -109,7 +109,7 @@ class KnowledgeBaseApiController extends Controller
 
             // Build subcategories by filtering the full flat list in PHP —
             // avoids generating WHERE parent_id = ? SQL
-            $allCategories = collect(\KbCategory::getTree($mailbox->id, [], 0, true))->all();
+            $allCategories = \KbCategory::where('mailbox_id', $mailbox->id)->get()->all();
             $subcategories = [];
             foreach ($allCategories as $c) {
                 if ((int)($c->parent_id ?? 0) !== (int)$category->id) {
@@ -414,7 +414,7 @@ class KnowledgeBaseApiController extends Controller
             $nested        = filter_var($request->input('nested', false), FILTER_VALIDATE_BOOLEAN);
 
             // Load all categories once and filter in PHP
-            $allCategories = collect(\KbCategory::getTree($mailbox->id, [], 0, true))->all();
+            $allCategories = \KbCategory::where('mailbox_id', $mailbox->id)->get()->all();
 
             $exportData = [
                 'mailbox_id'   => $mailbox->id,
@@ -485,7 +485,7 @@ class KnowledgeBaseApiController extends Controller
      * Reads parent_id from already-loaded Eloquent attributes — never generates SQL.
      * Root categories have parent_id = 0 (or null) in FreeScout's schema.
      *
-     * @param array  $allCategories  Full flat list from getTree(0, true)
+     * @param array  $allCategories  Full flat list from KbCategory::where('mailbox_id', ...)->get()->all()
      * @param int    $parentId       0 for root level
      * @param int    $mailboxId
      * @param string $locale
@@ -522,7 +522,7 @@ class KnowledgeBaseApiController extends Controller
     /**
      * Build a flat list of visible categories with parent_id references.
      *
-     * @param array  $allCategories  Full flat list from getTree(0, true)
+     * @param array  $allCategories  Full flat list from KbCategory::where('mailbox_id', ...)->get()->all()
      * @param int    $mailboxId
      * @param string $locale
      * @return array
@@ -555,7 +555,7 @@ class KnowledgeBaseApiController extends Controller
     /**
      * Recursively build a nested export category tree from a pre-loaded flat list.
      *
-     * @param array  $allCategories  Full flat list from getTree(0, true)
+     * @param array  $allCategories  Full flat list from KbCategory::where('mailbox_id', ...)->get()->all()
      * @param int    $parentId       0 for root level
      * @param int    $mailboxId
      * @param string $locale

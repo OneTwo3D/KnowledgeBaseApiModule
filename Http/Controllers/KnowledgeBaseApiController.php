@@ -24,6 +24,16 @@ class KnowledgeBaseApiController extends Controller
     public function __construct()
     {
         // Token validation is handled by middleware
+
+        // Prevent KbCategory from lazy-loading its `children` relationship.
+        // checkVisibility() recursively loads parent categories as fresh instances;
+        // without this guard each parent triggers WHERE parent_id = ? which fails
+        // on KB installs where that column doesn't exist.
+        KbCategory::retrieved(function ($cat) {
+            if (!$cat->relationLoaded('children')) {
+                $cat->setRelation('children', collect());
+            }
+        });
     }
 
     /**

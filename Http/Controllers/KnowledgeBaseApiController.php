@@ -84,7 +84,7 @@ class KnowledgeBaseApiController extends Controller
             ], 200);
         } catch (\Exception $e) {
             \Log::error('[KnowledgeBaseApi] '.$e->getMessage(), ['exception' => $e]);
-            return Response::json(['error' => $e->getMessage()], 500);
+            return Response::json(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }
     }
 
@@ -190,7 +190,7 @@ class KnowledgeBaseApiController extends Controller
                 'articles' => $articles,
             ], 200);
         } catch (\Exception $e) {
-            return Response::json(['error' => $e->getMessage()], 500);
+            return Response::json(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }
     }
 
@@ -275,7 +275,7 @@ class KnowledgeBaseApiController extends Controller
                 'results' => $results
             ], 200);
         } catch (\Exception $e) {
-            return Response::json(['error' => $e->getMessage()], 500);
+            return Response::json(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }
     }
 
@@ -359,7 +359,7 @@ class KnowledgeBaseApiController extends Controller
                 ]
             ], 200);
         } catch (\Exception $e) {
-            return Response::json(['error' => $e->getMessage()], 500);
+            return Response::json(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }
     }
 
@@ -611,7 +611,7 @@ class KnowledgeBaseApiController extends Controller
             
             return Response::json($response, 200);
         } catch (\Exception $e) {
-            return Response::json(['error' => $e->getMessage()], 500);
+            return Response::json(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }
     }
 
@@ -687,7 +687,7 @@ class KnowledgeBaseApiController extends Controller
 
             return Response::json($exportData, 200);
         } catch (\Exception $e) {
-            return Response::json(['error' => $e->getMessage()], 500);
+            return Response::json(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }
     }
 

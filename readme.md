@@ -1,6 +1,6 @@
 # Knowledge Base API Module for FreeScout
 
-This module adds a public REST API for the [FreeScout](https://freescout.net) knowledge base with nested category support, analytics, custom URL templates, and a built-in testing interface.
+This module (forked from EcomGraduates and @jtorvald) adds a public REST API for the [FreeScout](https://freescout.net) knowledge base with nested category support, analytics, custom URL templates, and a built-in testing interface.
 
 ## Requirements
 

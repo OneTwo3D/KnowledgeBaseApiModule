@@ -40,15 +40,18 @@ class KnowledgeBaseApiController extends Controller
             if ($mailbox === null) {
                 return Response::json(['error' => 'Mailbox not found'], 404);
             }
-            $categories = \KbCategory::getTree($mailbox->id, [], 0, true);
+            // Load all categories at all nesting levels so parent_id values are correct.
+            // getTree() only returns root-level categories (parent_id = 0), so we query
+            // directly to get every category including nested children.
+            $allCategories = KbCategory::where('mailbox_id', $mailbox->id)->orderBy('id')->get();
 
             $locale = $request->input('locale') ?? \Kb::defaultLocale($mailbox);
             $nested = filter_var($request->input('nested', false), FILTER_VALIDATE_BOOLEAN);
 
             // Filter to only visible categories
-            $visibleCategories = array_filter(is_array($categories) ? $categories : $categories->all(), function ($c) {
+            $visibleCategories = $allCategories->filter(function ($c) {
                 return $c->checkVisibility();
-            });
+            })->values()->all();
 
             if ($nested) {
                 $items = $this->buildCategoryTree($visibleCategories, null, $mailbox->id, $locale);

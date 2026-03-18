@@ -24,6 +24,14 @@ class KnowledgeBaseApiController extends Controller
     public function __construct()
     {
         // Token validation is handled by middleware
+
+        \DB::listen(function ($query) {
+            if (str_contains($query->sql, 'parent_id')) {
+                \Log::error('[parent_id query] ' . $query->sql, [
+                    'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 15)
+                ]);
+            }
+        });
     }
 
     /**

@@ -81,6 +81,7 @@ class KnowledgeBaseApiController extends Controller
                 'categories' => $items,
             ], 200);
         } catch (\Exception $e) {
+            \Log::error('[KnowledgeBaseApi] '.$e->getMessage(), ['exception' => $e]);
             return Response::json(['error' => $e->getMessage()], 500);
         }
     }

@@ -40,9 +40,8 @@ class KnowledgeBaseApiController extends Controller
             if ($mailbox === null) {
                 return Response::json(['error' => 'Mailbox not found'], 404);
             }
-            // Load all categories at all nesting levels so parent_id values are correct.
-            // getTree() only returns root-level categories (parent_id = 0), so we query
-            // directly to get every category including nested children.
+            // Load all categories at all nesting levels. The KB module stores the
+            // parent relationship in kb_category_id (not parent_id).
             $allCategories = KbCategory::where('mailbox_id', $mailbox->id)->orderBy('id')->get();
 
             $locale = $request->input('locale') ?? \Kb::defaultLocale($mailbox);
@@ -68,7 +67,7 @@ class KnowledgeBaseApiController extends Controller
 
                     $items[] = [
                         'id' => $c->id,
-                        'parent_id' => $c->parent_id ?: null,
+                        'parent_id' => $c->kb_category_id ?: null,
                         'name' => $c->getAttributeInLocale('name', $locale),
                         'description' => $c->getAttributeInLocale('description', $locale),
                         'url' => $categoryUrl,
@@ -151,7 +150,7 @@ class KnowledgeBaseApiController extends Controller
             // Build subcategories (direct children)
             $subcategories = [];
             $children = KbCategory::where('mailbox_id', $mailbox->id)
-                ->where('parent_id', $category->id)
+                ->where('kb_category_id', $category->id)
                 ->get();
 
             foreach ($children as $child) {
@@ -181,7 +180,7 @@ class KnowledgeBaseApiController extends Controller
                 'name' => $mailbox->name,
                 'category' => [
                     'id' => $category->id,
-                    'parent_id' => $category->parent_id ?: null,
+                    'parent_id' => $category->kb_category_id ?: null,
                     'name' => $category->getAttributeInLocale('name', $locale),
                     'description' => $category->getAttributeInLocale('description', $locale),
                     'url' => $categoryUrl,
@@ -378,7 +377,7 @@ class KnowledgeBaseApiController extends Controller
         $tree = [];
 
         foreach ($allCategories as $category) {
-            $catParentId = $category->parent_id ?: null;
+            $catParentId = $category->kb_category_id ?: null;
 
             if ($catParentId !== $parentId) {
                 continue;
@@ -394,7 +393,7 @@ class KnowledgeBaseApiController extends Controller
 
             $tree[] = [
                 'id' => $category->id,
-                'parent_id' => $category->parent_id ?: null,
+                'parent_id' => $category->kb_category_id ?: null,
                 'name' => $category->getAttributeInLocale('name', $locale),
                 'description' => $category->getAttributeInLocale('description', $locale),
                 'url' => $categoryUrl,
@@ -658,7 +657,7 @@ class KnowledgeBaseApiController extends Controller
                 foreach ($visibleCategories as $category) {
                     $categoryData = [
                         'id' => $category->id,
-                        'parent_id' => $category->parent_id ?: null,
+                        'parent_id' => $category->kb_category_id ?: null,
                         'name' => $category->getAttributeInLocale('name', $locale),
                         'description' => $category->getAttributeInLocale('description', $locale),
                         'url' => $this->buildCategoryUrl($mailbox->id, $category->id),
@@ -707,7 +706,7 @@ class KnowledgeBaseApiController extends Controller
         $tree = [];
 
         foreach ($allCategories as $category) {
-            $catParentId = $category->parent_id ?: null;
+            $catParentId = $category->kb_category_id ?: null;
 
             if ($catParentId !== $parentId) {
                 continue;
@@ -732,7 +731,7 @@ class KnowledgeBaseApiController extends Controller
 
             $tree[] = [
                 'id' => $category->id,
-                'parent_id' => $category->parent_id ?: null,
+                'parent_id' => $category->kb_category_id ?: null,
                 'name' => $category->getAttributeInLocale('name', $locale),
                 'description' => $category->getAttributeInLocale('description', $locale),
                 'url' => $this->buildCategoryUrl($mailboxId, $category->id),

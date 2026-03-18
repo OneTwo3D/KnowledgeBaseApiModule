@@ -25,6 +25,7 @@ class KnowledgeBaseApiModuleServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->registerMiddleware($router);
         $this->hooks();
+
     }
 
     /**

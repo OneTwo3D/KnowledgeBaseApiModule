@@ -26,14 +26,6 @@ class KnowledgeBaseApiModuleServiceProvider extends ServiceProvider
         $this->registerMiddleware($router);
         $this->hooks();
 
-        \DB::listen(function ($query) {
-            if (str_contains($query->sql, 'parent_id')) {
-                \Log::error('[parent_id query] ' . $query->sql, [
-                    'bindings' => $query->bindings,
-                    'trace'    => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 20)
-                ]);
-            }
-        });
     }
 
     /**
